@@ -7,30 +7,30 @@ import (
 	"path"
 )
 
-const archiveName = "node_vendor.tar.gz"
-
-func Compress(nodeModulesInput string, packDest string, workingDir string) (string, error) {
-	err := folderPathValid(nodeModulesInput)
+func Compress(
+	packDest string,
+	workingDir string,
+	archiveName string,
+) error {
+	err := folderPathValid(path.Join(workingDir, "node_modules"))
 	if err != nil {
-		return "", fmt.Errorf("error during the opening of node_modules directory: %w", err)
-
+		return fmt.Errorf("error during the opening of node_modules directory: %w", err)
 	}
 
 	err = folderPathValid(packDest)
 	if err != nil {
-		return "", fmt.Errorf("destination path is not valid: %w", err)
+		return fmt.Errorf("destination path is not valid: %w", err)
 	}
 
-	fullDestPath := path.Join(packDest, archiveName)
-
-	cmd := exec.Command("tar", "-zcvf", fullDestPath, nodeModulesInput)
+	cmd := exec.Command("tar", "-zcf", archiveName, "node_modules")
 	cmd.Dir = workingDir
-	err = cmd.Run()
+	cmd.Stderr = os.Stderr
+	_, err = cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("error during the compression of node_modules directory: %w", err)
+		return fmt.Errorf("error during the compression of node_modules directory: %w", err)
 	}
 
-	return fullDestPath, nil
+	return nil
 }
 
 func folderPathValid(path string) error {

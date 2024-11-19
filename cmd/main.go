@@ -3,15 +3,16 @@ package main
 import (
 	"log/slog"
 	"os"
+	"path"
 
 	"github.com/cdimonaco/obs-service-vendor-node-modules/internal/nodemodules"
 	"github.com/jessevdk/go-flags"
 )
 
 type opts struct {
-	NodeModulesDir string `long:"node-modules-folder" description:"Input node_modules directory" required:"true"`
-	OutputDir      string `long:"output-dir" description:"Archive output directory" required:"true"`
-	WorkingDir     string `long:"workdir" description:"Service working directory" required:"false"`
+	ArchiveName string `long:"archive-name" description:"node_modules archive name" default:"node_vendor.tar.gz"`
+	OutputDir   string `long:"output-dir" description:"Archive output directory"`
+	WorkingDir  string `long:"workdir" description:"Service working directory"`
 }
 
 func main() {
@@ -32,21 +33,34 @@ func main() {
 		cwd = opts.WorkingDir
 	}
 
+	outputDir := cwd
+	if opts.OutputDir != "" {
+		outputDir = opts.OutputDir
+	}
+
 	logger.Info(
 		"starting obs-service-vendor-node-modules",
-		"node-modules-folder",
-		opts.NodeModulesDir,
+		"archive-name",
+		opts.ArchiveName,
 		"output-dir",
 		opts.OutputDir,
 		"workdir",
 		cwd,
 	)
 
-	archivePath, err := nodemodules.Compress(opts.NodeModulesDir, opts.OutputDir, cwd)
+	err = nodemodules.Install(cwd)
+	if err != nil {
+		logger.Error("could not install the node dependencies", "error", err)
+		os.Exit(1)
+	}
+
+	logger.Info("node dependencies installed")
+
+	err = nodemodules.Compress(outputDir, cwd, opts.ArchiveName)
 	if err != nil {
 		logger.Error("could not compress node_modules archive", "error", err)
 		os.Exit(1)
 	}
 
-	logger.Info("node_modules archive created", "path", archivePath)
+	logger.Info("node_modules archive created", "archive", path.Join(outputDir, opts.ArchiveName))
 }
