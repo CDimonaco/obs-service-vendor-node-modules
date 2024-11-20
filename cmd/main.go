@@ -12,7 +12,7 @@ import (
 type opts struct {
 	ArchiveName string `long:"archive-name" description:"node_modules archive name" default:"node_vendor.tar.gz"`
 	OutputDir   string `long:"outdir" description:"Archive output directory"`
-	WorkingDir  string `long:"workdir" description:"Service working directory"`
+	SubDir      string `long:"subdir" description:"Service working directory"`
 }
 
 func main() {
@@ -29,8 +29,8 @@ func main() {
 		panic(err)
 	}
 
-	if opts.WorkingDir != "" {
-		cwd = opts.WorkingDir
+	if opts.SubDir != "" {
+		cwd = path.Join(cwd, opts.SubDir)
 	}
 
 	outputDir := cwd

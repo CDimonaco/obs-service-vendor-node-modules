@@ -1,13 +1,13 @@
 <service name="obs-service-vendor-node-modules">
   <summary>OBS Source Service to vendor node_modules</summary>
   <description>This Source Service will install node dependencies and vendor the node_modules folder in a compress archive. The archive could then be unpacked to have all the dependencies available in the build phase.</description>
-  <parameter name="workdir">
+  <parameter name="subdir">
     <description>Working directory in which run all the install/compress procedure, not required.</description>
   </parameter>
   <parameter name="node-modules-folder">
     <description>Specify node_modules path, not required, default: "node_modules"</description>
   </parameter>
-  <parameter name="output-dir">
+  <parameter name="outdir">
     <description>Specify the output directory of the dependencies archive, not required.</description>
   </parameter>
   <parameter name="archive-name">
