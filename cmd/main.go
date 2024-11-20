@@ -11,7 +11,7 @@ import (
 
 type opts struct {
 	ArchiveName string `long:"archive-name" description:"node_modules archive name" default:"node_vendor.tar.gz"`
-	OutputDir   string `long:"output-dir" description:"Archive output directory"`
+	OutputDir   string `long:"outdir" description:"Archive output directory"`
 	WorkingDir  string `long:"workdir" description:"Service working directory"`
 }
 
