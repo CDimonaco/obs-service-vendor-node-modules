@@ -10,9 +10,11 @@ import (
 )
 
 type opts struct {
-	ArchiveName string `long:"archive-name" description:"node_modules archive name" default:"node_vendor.tar.gz"`
-	OutputDir   string `long:"outdir" description:"Archive output directory"`
-	SubDir      string `long:"subdir" description:"Service working directory"`
+	SrcArchive  string `long:"srcarchive" description:"The source archive name" required:"true"`
+	SubDir      string `long:"subdir" description:"Subdirectory relative to the source code root"`
+	Compression string `long:"compression" description:"Compression method used by source archive" default:"gz" choice:"gz" choice:"zst"`
+	ArchiveName string `long:"vendor-archive-name" description:"node_modules archive name, will be compress with the same method as source archive" default:"node_vendor.tar.gz"`
+	OutputDir   string `long:"outdir" description:"Archive output directory" required:"true"`
 }
 
 func main() {
@@ -33,11 +35,6 @@ func main() {
 		cwd = path.Join(cwd, opts.SubDir)
 	}
 
-	outputDir := cwd
-	if opts.OutputDir != "" {
-		outputDir = opts.OutputDir
-	}
-
 	logger.Info(
 		"starting obs-service-vendor-node-modules",
 		"archive-name",
@@ -56,11 +53,11 @@ func main() {
 
 	logger.Info("node dependencies installed")
 
-	err = nodemodules.Compress(outputDir, cwd, opts.ArchiveName)
+	err = nodemodules.Compress(opts.OutputDir, cwd, opts.ArchiveName)
 	if err != nil {
 		logger.Error("could not compress node_modules archive", "error", err)
 		os.Exit(1)
 	}
 
-	logger.Info("node_modules archive created", "archive", path.Join(outputDir, opts.ArchiveName))
+	logger.Info("node_modules archive created", "archive", path.Join(opts.OutputDir, opts.ArchiveName))
 }
