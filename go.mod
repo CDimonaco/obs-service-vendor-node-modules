@@ -1,4 +1,4 @@
-module github.com/cdimonaco/obs-service-vendor-node-modules
+module github.com/cdimonaco/obs-service-vendor_node_modules
 
 go 1.23.3
 

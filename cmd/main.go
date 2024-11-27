@@ -5,7 +5,7 @@ import (
 	"os"
 	"path"
 
-	"github.com/cdimonaco/obs-service-vendor-node-modules/internal/nodemodules"
+	"github.com/cdimonaco/obs-service-vendor_node_modules/internal/nodemodules"
 	"github.com/jessevdk/go-flags"
 )
 
@@ -36,7 +36,7 @@ func main() {
 	}
 
 	logger.Info(
-		"starting obs-service-vendor-node-modules",
+		"starting obs-service-vendor_node_modules",
 		"archive-name",
 		opts.ArchiveName,
 		"output-dir",
