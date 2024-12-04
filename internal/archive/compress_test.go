@@ -2,6 +2,7 @@ package archive_test
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -13,21 +14,35 @@ import (
 )
 
 func TestGzFolderCompressionSuccess(t *testing.T) {
+	ctx := context.TODO()
 	fixturesFolder := "../../testfixtures/tocompress"
 	outDir := t.TempDir()
 	archiveName := "test.tar.gz"
 
-	err := archive.CompressFolder(fixturesFolder, outDir, archiveName, archive.GZ)
+	err := archive.CompressFolder(
+		ctx,
+		fixturesFolder,
+		outDir,
+		archiveName,
+		archive.GZ,
+	)
 	assert.NoError(t, err)
 	assert.NoError(t, checkIsTarGz(path.Join(outDir, archiveName)))
 }
 
 func TestZstFolderCompressionSuccess(t *testing.T) {
+	ctx := context.TODO()
 	fixturesFolder := "../../testfixtures/tocompress"
 	outDir := t.TempDir()
 	archiveName := "test.tar.zst"
 
-	err := archive.CompressFolder(fixturesFolder, outDir, archiveName, archive.ZST)
+	err := archive.CompressFolder(
+		ctx,
+		fixturesFolder,
+		outDir,
+		archiveName,
+		archive.ZST,
+	)
 	assert.NoError(t, err)
 	assert.NoError(t, checkIsTarZst(path.Join(outDir, archiveName)))
 }
@@ -67,7 +82,7 @@ func TestCompressError(t *testing.T) {
 
 	for name, test := range tc {
 		t.Run(name, func(t *testing.T) {
-			err := archive.CompressFolder(test.inputFolder, test.outDir, "test.tar.gz", archive.GZ)
+			err := archive.CompressFolder(context.TODO(), test.inputFolder, test.outDir, "test.tar.gz", archive.GZ)
 			assert.ErrorContains(t, err, test.errorContains)
 		})
 	}

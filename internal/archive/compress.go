@@ -1,16 +1,14 @@
 package archive
 
 import (
-	"archive/tar"
+	"context"
 	"fmt"
-	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
 
-	"github.com/klauspost/compress/gzip"
-	"github.com/klauspost/compress/zstd"
+	"github.com/mholt/archives"
 )
 
 type SupportedArchive string
@@ -21,36 +19,63 @@ const (
 )
 
 func compressWithZst(
+	ctx context.Context,
 	absInputPath string,
 	archiveFile *os.File,
 ) error {
-	enc, err := zstd.NewWriter(archiveFile)
+	archiveFiles, err := buildArchiveFileStructure(absInputPath)
 	if err != nil {
 		return err
 	}
 
-	defer enc.Close()
+	files, err := archives.FilesFromDisk(ctx, nil, archiveFiles)
+	if err != nil {
+		return err
+	}
 
-	tw := tar.NewWriter(enc)
-	defer tw.Close()
+	format := archives.CompressedArchive{
+		Compression: archives.Zstd{},
+		Archival:    archives.Tar{},
+	}
 
-	return buildTarArchive(absInputPath, tw)
+	err = format.Archive(ctx, archiveFile, files)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func compressWithGz(
+	ctx context.Context,
 	absInputPath string,
 	archiveFile *os.File,
 ) error {
-	gw := gzip.NewWriter(archiveFile)
-	defer gw.Close()
+	archiveFiles, err := buildArchiveFileStructure(absInputPath)
+	if err != nil {
+		return err
+	}
 
-	tw := tar.NewWriter(gw)
-	defer tw.Close()
+	files, err := archives.FilesFromDisk(ctx, nil, archiveFiles)
+	if err != nil {
+		return err
+	}
 
-	return buildTarArchive(absInputPath, tw)
+	format := archives.CompressedArchive{
+		Compression: archives.Gz{},
+		Archival:    archives.Tar{},
+	}
+
+	err = format.Archive(ctx, archiveFile, files)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func CompressFolder(
+	ctx context.Context,
 	inputPath string,
 	outputPath string,
 	archiveName string,
@@ -87,10 +112,10 @@ func CompressFolder(
 	defer out.Close()
 
 	if archiveType == GZ {
-		return compressWithGz(absInputPath, out)
+		return compressWithGz(ctx, absInputPath, out)
 	}
 
-	return compressWithZst(absInputPath, out)
+	return compressWithZst(ctx, absInputPath, out)
 }
 
 func folderPathValid(path string) error {
@@ -114,11 +139,13 @@ func stripTrailingSlashes(path string) string {
 	return path
 }
 
-func buildTarArchive(
-	inputPath string,
-	tw *tar.Writer,
-) error {
-	return filepath.Walk(inputPath, func(file string, fi os.FileInfo, err error) error {
+func buildArchiveFileStructure(
+	rootPath string,
+) (map[string]string, error) {
+	archiveFiles := make(map[string]string)
+	archiveBaseFolder := path.Base(rootPath)
+
+	err := filepath.Walk(rootPath, func(file string, fi os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -127,28 +154,16 @@ func buildTarArchive(
 			return nil
 		}
 
-		header, err := tar.FileInfoHeader(fi, fi.Name())
-		if err != nil {
-			return err
-		}
+		fileName := strings.TrimPrefix(strings.Replace(file, rootPath, "", -1), string(filepath.Separator))
 
-		header.Name = strings.TrimPrefix(strings.Replace(file, inputPath, "", -1), string(filepath.Separator))
-
-		if err := tw.WriteHeader(header); err != nil {
-			return err
-		}
-
-		f, err := os.Open(file)
-		if err != nil {
-			return err
-		}
-
-		if _, err := io.Copy(tw, f); err != nil {
-			return err
-		}
-
-		f.Close()
+		archiveFiles[file] = path.Join(archiveBaseFolder, fileName)
 
 		return nil
 	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return archiveFiles, nil
 }
