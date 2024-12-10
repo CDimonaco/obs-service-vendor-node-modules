@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"path"
@@ -15,7 +16,7 @@ type opts struct {
 	SrcArchive  string `long:"srcarchive" description:"The source archive name" required:"true"`
 	SubDir      string `long:"subdir" description:"Subdirectory relative to the source code root"`
 	Compression string `long:"compression" description:"Compression method used by source archive" default:"gz" choice:"gz" choice:"zst"`
-	ArchiveName string `long:"vendor-archive-name" description:"node_modules archive name, will be compress with the same method as source archive" default:"node_vendor.tar.gz"`
+	ArchiveName string `long:"vendor-archive-name" description:"node_modules archive name, will be compress with the same method as source archive" default:"node_vendor"`
 	OutputDir   string `long:"outdir" description:"Archive output directory" required:"true"`
 }
 
@@ -34,6 +35,8 @@ func main() {
 		panic(err)
 	}
 
+	vendorArchiveName := fmt.Sprintf("%s.tar.%s", opts.ArchiveName, opts.Compression)
+
 	logger.Info(
 		"starting obs-service-vendor_node_modules",
 		"srcarchive",
@@ -45,7 +48,7 @@ func main() {
 		"outdir",
 		opts.OutputDir,
 		"archive-name",
-		opts.ArchiveName,
+		vendorArchiveName,
 	)
 
 	logger.Info("unpacking source archive", "name", opts.SrcArchive)
@@ -87,7 +90,7 @@ func main() {
 		ctx,
 		path.Join(npmCwd, "node_modules"),
 		opts.OutputDir,
-		opts.ArchiveName,
+		vendorArchiveName,
 		archive.SupportedArchive(opts.Compression),
 	)
 	if err != nil {
@@ -95,5 +98,5 @@ func main() {
 		os.Exit(1)
 	}
 
-	logger.Info("node_modules archive created", "archive", path.Join(opts.OutputDir, opts.ArchiveName))
+	logger.Info("node_modules archive created", "archive", path.Join(opts.OutputDir, vendorArchiveName))
 }
