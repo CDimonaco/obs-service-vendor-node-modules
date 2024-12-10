@@ -30,11 +30,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	cwd, err := os.Getwd()
-	if err != nil {
-		panic(err)
-	}
-
 	vendorArchiveName := fmt.Sprintf("%s.tar.%s", opts.ArchiveName, opts.Compression)
 
 	logger.Info(
@@ -52,7 +47,7 @@ func main() {
 	)
 
 	logger.Info("unpacking source archive", "name", opts.SrcArchive)
-	sourceUnpackDest := path.Join(cwd, "source_dest")
+	sourceUnpackDest := path.Join(opts.OutputDir, "source_dest")
 
 	err = os.MkdirAll(sourceUnpackDest, 0755)
 	if err != nil {
@@ -71,7 +66,20 @@ func main() {
 		os.Exit(1)
 	}
 
-	npmCwd := sourceUnpackDest
+	// cwd into the extracted source directory
+	// it's the first and only directory in the source_dest directory
+	dirs, err := os.ReadDir(sourceUnpackDest)
+	if err != nil {
+		logger.Error("could not find read the source_dest directory after source extraction", "error", err)
+		os.Exit(1)
+	}
+
+	if len(dirs) != 1 {
+		logger.Error("more than one directory in source_dest folder, fatal error occured")
+		os.Exit(1)
+	}
+
+	npmCwd := path.Join(sourceUnpackDest, dirs[0].Name())
 	if opts.SubDir != "" {
 		npmCwd = path.Join(npmCwd, opts.SubDir)
 	}
@@ -86,6 +94,8 @@ func main() {
 
 	logger.Info("node dependencies installed", "subdir", opts.SubDir)
 
+	logger.Info("compressing node modules")
+
 	err = archive.CompressFolder(
 		ctx,
 		path.Join(npmCwd, "node_modules"),
@@ -99,4 +109,9 @@ func main() {
 	}
 
 	logger.Info("node_modules archive created", "archive", path.Join(opts.OutputDir, vendorArchiveName))
+
+	err = os.RemoveAll(sourceUnpackDest)
+	if err != nil {
+		logger.Error("error during cleanup, please clean manually source_dest folder")
+	}
 }
