@@ -5,8 +5,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
+	"os/exec"
 	"path"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/cdimonaco/obs-service-vendor_node_modules/internal/archive"
@@ -18,6 +22,7 @@ func TestGzFolderCompressionSuccess(t *testing.T) {
 	fixturesFolder := "../../testfixtures/tocompress"
 	outDir := t.TempDir()
 	archiveName := "test.tar.gz"
+	fullArchivePath := path.Join(outDir, archiveName)
 
 	err := archive.CompressFolder(
 		ctx,
@@ -27,7 +32,9 @@ func TestGzFolderCompressionSuccess(t *testing.T) {
 		archive.GZ,
 	)
 	assert.NoError(t, err)
-	assert.NoError(t, checkIsTarGz(path.Join(outDir, archiveName)))
+	assert.NoError(t, checkIsTarGz(fullArchivePath))
+	assert.NoError(t, uncompressArchiveWithCli(fullArchivePath, outDir))
+	assert.NoError(t, checkCompressedArchiveStructure(fixturesFolder, path.Join(outDir, "tocompress")))
 }
 
 func TestZstFolderCompressionSuccess(t *testing.T) {
@@ -35,6 +42,7 @@ func TestZstFolderCompressionSuccess(t *testing.T) {
 	fixturesFolder := "../../testfixtures/tocompress"
 	outDir := t.TempDir()
 	archiveName := "test.tar.zst"
+	fullArchivePath := path.Join(outDir, archiveName)
 
 	err := archive.CompressFolder(
 		ctx,
@@ -45,9 +53,11 @@ func TestZstFolderCompressionSuccess(t *testing.T) {
 	)
 	assert.NoError(t, err)
 	assert.NoError(t, checkIsTarZst(path.Join(outDir, archiveName)))
+	assert.NoError(t, uncompressArchiveWithCli(fullArchivePath, outDir))
+	assert.NoError(t, checkCompressedArchiveStructure(fixturesFolder, path.Join(outDir, "tocompress")))
 }
 
-func TestCompressError(t *testing.T) {
+func TestCompressErrors(t *testing.T) {
 	tc := map[string]struct {
 		inputFolder   string
 		outDir        string
@@ -78,11 +88,17 @@ func TestCompressError(t *testing.T) {
 			errorContains: "output folder for compressed archive is invalid",
 			archiveType:   archive.ZST,
 		},
+		"should return error when archive type is not supported": {
+			inputFolder:   "../../testfixtures/tocompress",
+			outDir:        t.TempDir(),
+			errorContains: "archive type invalid, not supported, use gz or zst",
+			archiveType:   archive.SupportedArchive("invalid"),
+		},
 	}
 
 	for name, test := range tc {
 		t.Run(name, func(t *testing.T) {
-			err := archive.CompressFolder(context.TODO(), test.inputFolder, test.outDir, "test.tar.gz", archive.GZ)
+			err := archive.CompressFolder(context.TODO(), test.inputFolder, test.outDir, "test.tar.gz", test.archiveType)
 			assert.ErrorContains(t, err, test.errorContains)
 		})
 	}
@@ -128,4 +144,49 @@ func checkIsTarZst(path string) error {
 	}
 
 	return fmt.Errorf("could not identify tar archive as compressed with zst")
+}
+
+func uncompressArchiveWithCli(tarPath string, workDir string) error {
+	cmd := exec.Command("tar", "-xvf", tarPath)
+	cmd.Stderr = os.Stderr
+	cmd.Dir = workDir
+	_, err := cmd.Output()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func checkCompressedArchiveStructure(expectedFolderRoot string, uncompressedArchiveRoot string) error {
+	return filepath.Walk(expectedFolderRoot, func(file string, info fs.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if !info.Mode().IsRegular() {
+			return nil
+		}
+
+		fileName := strings.TrimPrefix(strings.Replace(file, expectedFolderRoot, "", -1), string(filepath.Separator))
+		// open expected file
+		expectedFile, err := os.ReadFile(file)
+		if err != nil {
+			return err
+		}
+
+		dpath := path.Join(uncompressedArchiveRoot, fileName)
+		// decompressed file
+		decompressedFile, err := os.ReadFile(dpath)
+		if err != nil {
+			return err
+		}
+
+		if !bytes.Equal(expectedFile, decompressedFile) {
+			return fmt.Errorf("file %s not equal to decompressed file", file)
+		}
+
+		return nil
+
+	})
 }
