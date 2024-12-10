@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"log/slog"
 	"os"
 	"path"
 
+	"github.com/cdimonaco/obs-service-vendor_node_modules/internal/archive"
 	"github.com/cdimonaco/obs-service-vendor_node_modules/internal/nodemodules"
 	"github.com/jessevdk/go-flags"
 )
@@ -18,6 +20,7 @@ type opts struct {
 }
 
 func main() {
+	ctx := context.Background()
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	var opts opts
@@ -31,29 +34,62 @@ func main() {
 		panic(err)
 	}
 
-	if opts.SubDir != "" {
-		cwd = path.Join(cwd, opts.SubDir)
-	}
-
 	logger.Info(
 		"starting obs-service-vendor_node_modules",
+		"srcarchive",
+		opts.SrcArchive,
+		"compression",
+		opts.Compression,
+		"subdir",
+		opts.SubDir,
+		"outdir",
+		opts.OutputDir,
 		"archive-name",
 		opts.ArchiveName,
-		"output-dir",
-		opts.OutputDir,
-		"workdir",
-		cwd,
 	)
 
-	err = nodemodules.Install(cwd)
+	logger.Info("unpacking source archive", "name", opts.SrcArchive)
+	sourceUnpackDest := path.Join(cwd, "source_dest")
+
+	err = os.MkdirAll(sourceUnpackDest, 0755)
+	if err != nil {
+		logger.Error("error during source decompress", "error", err)
+		os.Exit(1)
+	}
+
+	err = archive.DecompressArchive(
+		ctx,
+		opts.SrcArchive,
+		sourceUnpackDest,
+		archive.SupportedArchive(opts.Compression),
+	)
+	if err != nil {
+		logger.Error("error during source decompress", "error", err)
+		os.Exit(1)
+	}
+
+	npmCwd := sourceUnpackDest
+	if opts.SubDir != "" {
+		npmCwd = path.Join(npmCwd, opts.SubDir)
+	}
+
+	logger.Info("installing node dependencies", "subdir", opts.SubDir)
+
+	err = nodemodules.Install(npmCwd)
 	if err != nil {
 		logger.Error("could not install the node dependencies", "error", err)
 		os.Exit(1)
 	}
 
-	logger.Info("node dependencies installed")
+	logger.Info("node dependencies installed", "subdir", opts.SubDir)
 
-	err = nodemodules.Compress(opts.OutputDir, cwd, opts.ArchiveName)
+	err = archive.CompressFolder(
+		ctx,
+		path.Join(npmCwd, "node_modules"),
+		opts.OutputDir,
+		opts.ArchiveName,
+		archive.SupportedArchive(opts.Compression),
+	)
 	if err != nil {
 		logger.Error("could not compress node_modules archive", "error", err)
 		os.Exit(1)
